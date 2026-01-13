@@ -765,13 +765,13 @@ class RelayPolicy {
 - [x] `international_bcd.dart` - Multi-country BCD with shortcuts
 - [x] Unit tests (101 new tests)
 
-### Phase 3: Payloads (Week 2)
-- [ ] `sos_payload.dart` - Ultra-compact SOS
-- [ ] `location_payload.dart` - GPS sharing
-- [ ] `text_payload.dart` - UTF-8 messages
-- [ ] `ack_payload.dart` - Acknowledgments
-- [ ] `packet.dart` - Complete packet abstraction
-- [ ] Roundtrip tests (encode → decode → verify)
+### Phase 3: Payloads (Week 2) ✅ COMPLETED
+- [x] `sos_payload.dart` - Ultra-compact SOS (15 bytes)
+- [x] `location_payload.dart` - GPS sharing (8/12 bytes)
+- [x] `text_payload.dart` - UTF-8 messages
+- [x] `ack_payload.dart` - Acknowledgments
+- [x] `packet.dart` - Complete packet abstraction
+- [x] Roundtrip tests (80+ new tests)
 
 ### Phase 4: Crypto (Week 2-3)
 - [ ] `key_derivation.dart` - PBKDF2
