@@ -162,6 +162,19 @@ void main() {
         final flagsPart2 = (encoded[1] >> 2) & 0x03;
         expect(flagsPart2, equals(0x03));
       });
+      test('SPEC COMPLIANCE: TTL=15 must match High Nibble (0xF0) in Byte 1', () {
+        final header = CompactHeader(
+          type: MessageType.sosBeacon,
+          flags: PacketFlags(),
+          ttl: 15,
+          messageId: 0x0000,
+        );
+
+        final encoded = header.encode();
+        // Byte 1 should be 0xF0 (TTL=15 in bits 7-4, Flags=0, Reserved=0)
+        expect(encoded[1] & 0xF0, equals(0xF0));
+        expect(encoded[1] & 0x0F, equals(0x00));
+      });
     });
 
     group('Decoding', () {

@@ -79,13 +79,13 @@ BYTE 0: MODE + TYPE + FLAGS[0:2]
     Bit 1: ACK_REQ (acknowledgment requested)
     Bit 0: ENCRYPTED
 
-BYTE 1: FLAGS[3:4] + TTL + RESERVED
+BYTE 1: TTL + FLAGS[3:4] + RESERVED
 ═══════════════════════════════════
-  Bits 7-6 (FLAGS[3:4]):
-    Bit 7: COMPRESSED
-    Bit 6: URGENT (priority relay)
-    
-  Bits 5-2 (TTL): 0-15 hops (4 bits yeterli, mesh için)
+  Bits 7-4 (TTL): 0-15 hops (High Nibble - Hex hizalı)
+  
+  Bits 3-2 (FLAGS[3:4]):
+    Bit 3: COMPRESSED
+    Bit 2: URGENT (priority relay)
   
   Bits 1-0: Reserved
 
