@@ -781,11 +781,11 @@ class RelayPolicy {
 - [x] Security tests (57 tests)
 
 
-### Phase 5: Fragmentation (Week 3)
-- [ ] `fragmenter.dart` - Packet splitting
-- [ ] `reassembler.dart` - Fragment assembly
-- [ ] `fragment_cache.dart` - Buffer management
-- [ ] Stress tests
+### Phase 5: Fragmentation (Week 3) ✅ COMPLETED
+- [x] `fragment_header.dart` - 3-byte fragment header
+- [x] `fragmenter.dart` - Packet splitting
+- [x] `reassembler.dart` - Fragment assembly + buffer management
+- [x] Unit tests (56 tests)
 
 ### Phase 6: Mesh Support (Week 3-4)
 - [ ] `message_cache.dart` - Duplicate detection

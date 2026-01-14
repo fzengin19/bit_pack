@@ -54,6 +54,7 @@ export 'src/protocol/payload/sos_payload.dart';
 export 'src/protocol/payload/location_payload.dart';
 export 'src/protocol/payload/text_payload.dart';
 export 'src/protocol/payload/ack_payload.dart';
+export 'src/protocol/payload/nack_payload.dart';
 
 // Protocol - Packet
 export 'src/protocol/packet.dart';
@@ -63,3 +64,8 @@ export 'src/crypto/key_derivation.dart';
 export 'src/crypto/aes_gcm.dart';
 export 'src/crypto/challenge.dart';
 
+// Fragmentation
+export 'src/fragmentation/fragment_header.dart';
+export 'src/fragmentation/fragmenter.dart';
+export 'src/fragmentation/reassembler.dart';
+export 'src/fragmentation/selective_repeat.dart';
