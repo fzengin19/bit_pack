@@ -57,3 +57,9 @@ export 'src/protocol/payload/ack_payload.dart';
 
 // Protocol - Packet
 export 'src/protocol/packet.dart';
+
+// Crypto
+export 'src/crypto/key_derivation.dart';
+export 'src/crypto/aes_gcm.dart';
+export 'src/crypto/challenge.dart';
+

@@ -773,11 +773,13 @@ class RelayPolicy {
 - [x] `packet.dart` - Complete packet abstraction
 - [x] Roundtrip tests (80+ new tests)
 
-### Phase 4: Crypto (Week 2-3)
-- [ ] `key_derivation.dart` - PBKDF2
-- [ ] `aes_gcm.dart` - Encryption/decryption
-- [ ] `challenge.dart` - Zero-knowledge verification
-- [ ] Security tests
+
+### Phase 4: Crypto (Week 2-3) ✅ COMPLETED
+- [x] `key_derivation.dart` - PBKDF2
+- [x] `aes_gcm.dart` - Encryption/decryption
+- [x] `challenge.dart` - Zero-knowledge verification
+- [x] Security tests (57 tests)
+
 
 ### Phase 5: Fragmentation (Week 3)
 - [ ] `fragmenter.dart` - Packet splitting
