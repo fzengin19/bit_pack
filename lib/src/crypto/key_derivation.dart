@@ -2,10 +2,14 @@
 ///
 /// PBKDF2-SHA256 based key derivation for symmetric encryption.
 /// Uses the `cryptography` package for secure key generation.
+///
+/// For UI applications, use [KeyDerivation.deriveKeyIsolated] to run
+/// the CPU-intensive PBKDF2 computation in a background isolate.
 
 library;
 
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
@@ -108,6 +112,77 @@ class KeyDerivation {
       return Uint8List.fromList(keyBytes);
     } catch (e) {
       throw KeyDerivationException('Key derivation failed', e);
+    }
+  }
+
+  /// Derive an AES key in a background isolate (UI-safe)
+  ///
+  /// This method runs PBKDF2 computation in a separate isolate,
+  /// preventing UI freezing on older devices (e.g., Android 5.1).
+  ///
+  /// Use this instead of [deriveKey] when calling from UI code.
+  ///
+  /// Parameters are the same as [deriveKey].
+  ///
+  /// Example:
+  /// ```dart
+  /// // Safe to call from UI thread
+  /// final key = await KeyDerivation.deriveKeyIsolated(
+  ///   password: 'shared secret',
+  ///   salt: salt,
+  /// );
+  /// ```
+  ///
+  /// Note: Requires Dart 2.19+ for [Isolate.run].
+  static Future<Uint8List> deriveKeyIsolated({
+    required String password,
+    required Uint8List salt,
+    int keyLength = 16,
+    int iterations = defaultIterations,
+  }) async {
+    // Validate parameters before spawning isolate
+    if (password.isEmpty) {
+      throw const KeyDerivationException('Password cannot be empty');
+    }
+
+    if (salt.length < minSaltLength) {
+      throw KeyDerivationException(
+        'Salt must be at least $minSaltLength bytes, got ${salt.length}',
+      );
+    }
+
+    if (keyLength != 16 && keyLength != 32) {
+      throw KeyDerivationException(
+        'Key length must be 16 (AES-128) or 32 (AES-256), got $keyLength',
+      );
+    }
+
+    if (iterations < minIterations || iterations > maxIterations) {
+      throw KeyDerivationException(
+        'Iterations must be between $minIterations and $maxIterations, got $iterations',
+      );
+    }
+
+    try {
+      // Run in background isolate
+      return await Isolate.run(() async {
+        final pbkdf2 = Pbkdf2(
+          macAlgorithm: Hmac.sha256(),
+          iterations: iterations,
+          bits: keyLength * 8,
+        );
+
+        final secretKey = await pbkdf2.deriveKey(
+          secretKey: SecretKey(utf8.encode(password)),
+          nonce: salt,
+        );
+
+        final keyBytes = await secretKey.extractBytes();
+        return Uint8List.fromList(keyBytes);
+      });
+    } catch (e) {
+      if (e is KeyDerivationException) rethrow;
+      throw KeyDerivationException('Key derivation in isolate failed', e);
     }
   }
 

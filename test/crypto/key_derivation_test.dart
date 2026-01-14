@@ -221,5 +221,63 @@ void main() {
         expect(salt.sublist(8, 16), equals(recipientId.sublist(0, 8)));
       });
     });
+
+    group('deriveKeyIsolated', () {
+      test('derives key in background isolate', () async {
+        final salt = KeyDerivation.generateSalt();
+        final key = await KeyDerivation.deriveKeyIsolated(
+          password: 'test password',
+          salt: salt,
+        );
+
+        expect(key.length, equals(16));
+      });
+
+      test('produces same result as deriveKey', () async {
+        final salt = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+        
+        final key1 = await KeyDerivation.deriveKey(
+          password: 'same password',
+          salt: salt,
+        );
+        
+        final key2 = await KeyDerivation.deriveKeyIsolated(
+          password: 'same password',
+          salt: salt,
+        );
+
+        expect(key1, equals(key2));
+      });
+
+      test('works with AES-256 key length', () async {
+        final salt = KeyDerivation.generateSalt();
+        final key = await KeyDerivation.deriveKeyIsolated(
+          password: 'test password',
+          salt: salt,
+          keyLength: 32,
+        );
+
+        expect(key.length, equals(32));
+      });
+
+      test('throws on empty password', () async {
+        final salt = KeyDerivation.generateSalt();
+        
+        expect(
+          () => KeyDerivation.deriveKeyIsolated(password: '', salt: salt),
+          throwsA(isA<KeyDerivationException>()),
+        );
+      });
+
+      test('throws on invalid parameters', () async {
+        final salt = Uint8List(4); // Too short
+        
+        expect(
+          () => KeyDerivation.deriveKeyIsolated(password: 'test', salt: salt),
+          throwsA(isA<KeyDerivationException>()),
+        );
+      });
+    });
   });
 }
+
