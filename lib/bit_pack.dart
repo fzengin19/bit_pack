@@ -58,6 +58,7 @@ export 'src/protocol/payload/nack_payload.dart';
 
 // Protocol - Packet
 export 'src/protocol/packet.dart';
+export 'src/protocol/packet_builder.dart';
 
 // Crypto
 export 'src/crypto/key_derivation.dart';
@@ -75,3 +76,8 @@ export 'src/mesh/message_cache.dart';
 export 'src/mesh/relay_backoff.dart';
 export 'src/mesh/relay_policy.dart';
 export 'src/mesh/mesh_controller.dart';
+export 'src/mesh/message_id_generator.dart';
+export 'src/mesh/peer_registry.dart';
+
+// Benchmark
+export 'src/benchmark/benchmark_suite.dart';
