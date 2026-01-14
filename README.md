@@ -55,7 +55,7 @@ Add BitPack to your `pubspec.yaml`:
 dependencies:
   bit_pack:
     git:
-      url: https://github.com/your-org/bit_pack.git
+      url: https://github.com/fzengin19/bit_pack.git
       ref: v1.0.0
 ```
 
