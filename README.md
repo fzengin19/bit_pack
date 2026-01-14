@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart"/>
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License"/>
-  <img src="https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-1.1.0-blue?style=for-the-badge" alt="Version"/>
   <img src="https://img.shields.io/badge/BLE-4.0+-purple?style=for-the-badge&logo=bluetooth&logoColor=white" alt="BLE 4.0+"/>
 </p>
 
@@ -56,7 +56,7 @@ dependencies:
   bit_pack:
     git:
       url: https://github.com/fzengin19/bit_pack.git
-      ref: v1.0.0
+      ref: v1.1.0
 ```
 
 Then run:
@@ -321,7 +321,12 @@ final encrypted = await AesGcmCipher.encryptWithHeader(
 - ✅ Automatic fragmentation/reassembly
 - ✅ Selective Repeat ARQ
 
-### v1.1.0 (Planned)
+### v1.1.0 (Current)
+- ✅ Hybrid Payloads (TextLocation)
+- ✅ Secure Challenges (ChallengePayload)
+- ✅ PacketBuilder fluent API
+
+### v1.2.0 (Planned)
 - 🔜 **File Transfer** — Binary data chunks with resume support
 - 🔜 **Wi-Fi Direct Handover** — Seamless transition for large transfers
 - 🔜 **Compression** — Optional payload compression

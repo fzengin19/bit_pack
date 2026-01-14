@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-15
+
+### Added
+
+- **Protocol v1.1**: Native support for hybrid payloads to reduce overhead.
+- **TextLocationPayload (0x1C)**: Combination of fixed-point GPS and UTF-8 text without delimiters.
+- **ChallengePayload (0x1D)**: Structured binary format for security challenges (Salt + Question + Ciphertext).
+- **PacketBuilder**: New fluent methods `textLocation()` and `challenge()`.
+
 ## [1.0.0] - 2026-01-14
 
 ### Added

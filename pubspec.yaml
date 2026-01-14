@@ -1,6 +1,6 @@
 name: bit_pack
 description: "A bandwidth-efficient binary protocol for off-grid mesh networking over BLE 4.0+. Designed for emergency communication apps."
-version: 1.0.0
+version: 1.1.0
 repository: https://github.com/fzengin19/bit_pack
 
 environment:
