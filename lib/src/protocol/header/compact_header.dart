@@ -18,6 +18,7 @@ import '../../core/constants.dart';
 import '../../core/exceptions.dart';
 import '../../core/types.dart';
 import '../../encoding/bitwise.dart';
+import 'packet_header.dart';
 
 /// Compact packet header (4 bytes)
 ///
@@ -25,23 +26,31 @@ import '../../encoding/bitwise.dart';
 /// - 16-bit message ID (vs 32-bit in Standard)
 /// - 4-bit hop TTL (max 15 hops)
 /// - No relative age tracking (only hop-count based expiration)
-class CompactHeader {
+class CompactHeader implements PacketHeader {
   /// Header size in bytes
-  static const int sizeInBytes = kCompactHeaderSize; // 4
+  static const int headerSizeInBytes = kCompactHeaderSize; // 4
+
+  @override
+  int get sizeInBytes => headerSizeInBytes;
 
   /// Packet mode (always compact)
+  @override
   final PacketMode mode = PacketMode.compact;
 
   /// Message type (4 bits, 0-15)
+  @override
   final MessageType type;
 
   /// Packet flags
+  @override
   final PacketFlags flags;
 
   /// Hop TTL (4 bits, 0-15)
+  @override
   final int ttl;
 
   /// Message ID for duplicate detection (16 bits)
+  @override
   final int messageId;
 
   /// Create a new compact header
@@ -78,6 +87,7 @@ class CompactHeader {
   }
 
   /// Check if this message has expired (TTL = 0)
+  @override
   bool get isExpired => ttl <= 0;
 
   /// Create a copy with TTL decremented for relay
@@ -99,6 +109,7 @@ class CompactHeader {
   /// BYTE 1: [TTL:4][COMPRESSED][URGENT][RESERVED:2]
   /// BYTES 2-3: MESSAGE_ID (16 bits, big-endian)
   /// ```
+  @override
   Uint8List encode() {
     final buffer = Uint8List(sizeInBytes);
 
@@ -130,9 +141,9 @@ class CompactHeader {
   /// [bytes] At least 4 bytes of data
   /// Throws [InvalidHeaderException] if data is invalid
   factory CompactHeader.decode(Uint8List bytes) {
-    if (bytes.length < sizeInBytes) {
+    if (bytes.length < headerSizeInBytes) {
       throw InsufficientHeaderException(
-        expected: sizeInBytes,
+        expected: headerSizeInBytes,
         actual: bytes.length,
       );
     }

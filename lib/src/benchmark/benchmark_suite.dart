@@ -115,7 +115,7 @@ class BenchmarkSuite {
 
     final stopwatch = Stopwatch()..start();
     for (var i = 0; i < iterations; i++) {
-      packet.encode(includeCrc: true);
+      packet.encode();
     }
     stopwatch.stop();
 
@@ -135,11 +135,11 @@ class BenchmarkSuite {
       longitude: 28.9784,
       phoneNumber: '5551234567',
     );
-    final encoded = packet.encode(includeCrc: true);
+    final encoded = packet.encode();
 
     final stopwatch = Stopwatch()..start();
     for (var i = 0; i < iterations; i++) {
-      Packet.decode(encoded, hasCrc: true);
+      Packet.decode(encoded);
     }
     stopwatch.stop();
 

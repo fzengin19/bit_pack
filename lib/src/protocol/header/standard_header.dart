@@ -1,7 +1,7 @@
-/// Standard Header Implementation (10 bytes)
+/// Standard Header Implementation (11 bytes)
 ///
 /// BLE 5.0+ header with full features including Relative Age TTL.
-/// Total size: 10 bytes
+/// Total size: 11 bytes
 ///
 /// Layout:
 /// ```
@@ -22,6 +22,7 @@ import '../../core/constants.dart';
 import '../../core/exceptions.dart';
 import '../../core/types.dart';
 import '../../encoding/bitwise.dart';
+import 'packet_header.dart';
 
 /// Standard packet header (10 bytes)
 ///
@@ -31,26 +32,33 @@ import '../../encoding/bitwise.dart';
 /// - 16-bit relative age (minutes since creation)
 /// - Security mode field
 /// - Payload length field
-class StandardHeader {
+class StandardHeader implements PacketHeader {
   /// Header size in bytes
-  static const int sizeInBytes = kStandardHeaderSize; // 10
+  static const int headerSizeInBytes = kStandardHeaderSize; // 11
+
+  @override
+  int get sizeInBytes => headerSizeInBytes;
 
   /// Packet mode (always standard)
+  @override
   final PacketMode mode = PacketMode.standard;
 
   /// Protocol version (0-1)
   final int version;
 
   /// Message type (6 bits, 0-63)
+  @override
   final MessageType type;
 
   /// Packet flags (8 bits)
+  @override
   final PacketFlags flags;
 
   /// Hop TTL (8 bits, 0-255)
   final int hopTtl;
 
   /// Message ID for duplicate detection (32 bits)
+  @override
   final int messageId;
 
   /// Security mode (3 bits)
@@ -141,9 +149,13 @@ class StandardHeader {
   /// A message expires when:
   /// - hopTtl reaches 0, OR
   /// - ageMinutes exceeds [kMaxAgeMinutes] (24 hours)
+  @override
   bool get isExpired {
     return hopTtl <= 0 || currentAgeMinutes >= kMaxAgeMinutes;
   }
+
+  @override
+  int get ttl => hopTtl;
 
   /// Create a copy prepared for relay
   ///
@@ -162,9 +174,10 @@ class StandardHeader {
     );
   }
 
-  /// Encode header to 10 bytes
+  /// Encode header to 11 bytes
   ///
   /// All multi-byte values are encoded as big-endian.
+  @override
   Uint8List encode() {
     final buffer = Uint8List(sizeInBytes);
 
@@ -209,9 +222,9 @@ class StandardHeader {
   ///
   /// Automatically calls [markReceived] to track local hold time.
   factory StandardHeader.decode(Uint8List bytes) {
-    if (bytes.length < sizeInBytes) {
+    if (bytes.length < headerSizeInBytes) {
       throw InsufficientHeaderException(
-        expected: sizeInBytes,
+        expected: headerSizeInBytes,
         actual: bytes.length,
       );
     }

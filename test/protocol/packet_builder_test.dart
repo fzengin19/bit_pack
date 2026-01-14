@@ -52,6 +52,24 @@ void main() {
         expect(packet.mode, equals(PacketMode.standard));
       });
 
+      test('auto-selects standard for standard-only message type', () {
+        final packet = PacketBuilder()
+            .type(MessageType.handshakeInit)
+            .payload(TextPayload(text: 'x'))
+            .build();
+
+        expect(packet.mode, equals(PacketMode.standard));
+      });
+
+      test('auto-selects standard for fragmentation flags', () {
+        final packet = PacketBuilder()
+            .text('Hello')
+            .fragment(true)
+            .build();
+
+        expect(packet.mode, equals(PacketMode.standard));
+      });
+
       test('auto-selects standard for high TTL', () {
         final packet = PacketBuilder()
             .text('Hello')

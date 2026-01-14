@@ -12,101 +12,79 @@ import '../core/exceptions.dart';
 import '../core/types.dart';
 import '../encoding/bitwise.dart';
 import '../encoding/crc8.dart';
+import '../encoding/crc32.dart';
 import 'header/compact_header.dart';
 import 'header/header_factory.dart';
+import 'header/packet_header.dart';
 import 'header/standard_header.dart';
 import 'payload/payload.dart';
 import 'payload/sos_payload.dart';
 import 'payload/location_payload.dart';
 import 'payload/text_payload.dart';
 import 'payload/ack_payload.dart';
+import 'payload/nack_payload.dart';
+import 'payload/raw_payload.dart';
+import '../mesh/message_id_generator.dart';
 
 /// Complete packet (header + payload)
 class Packet {
   /// Header (compact or standard)
-  final Object header;
+  final PacketHeader header;
 
   /// Payload data
   final Payload payload;
-
-  /// CRC-8 checksum (for compact SOS packets)
-  final int? crc;
 
   /// Raw encoded bytes (cached)
   Uint8List? _encoded;
 
   /// Create a packet from header and payload
-  Packet({required this.header, required this.payload, this.crc}) {
-    // Validate header type
-    if (header is! CompactHeader && header is! StandardHeader) {
-      throw ArgumentError('Header must be CompactHeader or StandardHeader');
-    }
-  }
+  Packet({required this.header, required this.payload});
 
   /// Get packet mode
   PacketMode get mode {
-    if (header is CompactHeader) return PacketMode.compact;
-    return PacketMode.standard;
+    return header.mode;
   }
 
   /// Get message type from header
   MessageType get type {
-    if (header is CompactHeader) return (header as CompactHeader).type;
-    return (header as StandardHeader).type;
+    return header.type;
   }
 
   /// Get message ID from header
   int get messageId {
-    if (header is CompactHeader) return (header as CompactHeader).messageId;
-    return (header as StandardHeader).messageId;
+    return header.messageId;
   }
 
-  /// Check if packet fits in BLE 4.2 MTU (20 bytes) with mandatory CRC
-  ///
-  /// For safety-critical Compact Mode: Header (4) + Payload + CRC (1) <= 20
+  /// Check if compact packet fits in BLE 4.2 MTU (20 bytes).
+  /// Wire format for compact is: header (4) + payload + CRC-8 (1)
   bool get fitsCompact {
-    if (header is! CompactHeader) return false;
-    // Compact Mode: 4 header + payload + 1 CRC <= 20 MTU
-    return kCompactHeaderSize + payload.sizeInBytes + kCrcSize <= kBle42MaxPayload;
+    if (mode != PacketMode.compact) return false;
+    return kCompactHeaderSize + payload.sizeInBytes + kCrcSize <=
+        kBle42MaxPayload;
   }
 
   /// Total packet size in bytes
   int get sizeInBytes {
-    final headerSize = header is CompactHeader
-        ? kCompactHeaderSize
-        : kStandardHeaderSize;
-    int size = headerSize + payload.sizeInBytes;
-    if (crc != null) size += 1;
-    return size;
+    final headerSize = header.sizeInBytes;
+    final payloadSize = payload.sizeInBytes;
+    final integritySize = mode == PacketMode.compact ? kCrcSize : 4;
+    return headerSize + payloadSize + integritySize;
   }
 
   /// Encode packet to bytes
-  ///
-  /// For Compact Mode, [includeCrc] should be true for safe transmission.
-  Uint8List encode({bool includeCrc = false}) {
-    if (_encoded != null && !includeCrc) return _encoded!;
+  Uint8List encode() {
+    if (_encoded != null) return _encoded!;
 
     // Encode header
-    final headerBytes = header is CompactHeader
-        ? (header as CompactHeader).encode()
-        : (header as StandardHeader).encode();
+    final headerBytes = header.encode();
 
     // Encode payload
     final payloadBytes = payload.encode();
 
-    // Safety assertion for Compact Mode
-    // BLE 4.2 MTU = 20 bytes: Header (4) + Payload + CRC (1)
-    if (header is CompactHeader && includeCrc) {
-      final totalSize = headerBytes.length + payloadBytes.length + kCrcSize;
-      assert(
-        totalSize <= kBle42MaxPayload,
-        'Compact packet with CRC exceeds 20-byte MTU: $totalSize bytes',
-      );
-    }
+    final integritySize = mode == PacketMode.compact ? kCrcSize : 4;
 
     // Combine
-    int size = headerBytes.length + payloadBytes.length;
-    if (includeCrc) size += 1;
+    final size = headerBytes.length + payloadBytes.length + integritySize;
 
     final buffer = Uint8List(size);
     buffer.setRange(0, headerBytes.length, headerBytes);
@@ -116,38 +94,54 @@ class Packet {
       payloadBytes,
     );
 
-    // Add CRC if requested
-    if (includeCrc) {
+    // Append integrity trailer
+    if (mode == PacketMode.compact) {
+      // CRC-8 over header+payload
       final crcValue = Crc8.compute(buffer.sublist(0, size - 1));
       buffer[size - 1] = crcValue;
+    } else {
+      // CRC-32/IEEE over header+payload (including ciphertext+tag if encrypted)
+      final crcValue = Crc32.compute(buffer.sublist(0, size - 4));
+      Bitwise.write32BE(buffer, size - 4, crcValue);
     }
 
-    if (!includeCrc) _encoded = buffer;
-    return buffer;
+    _encoded = buffer;
+    return _encoded!;
   }
 
   /// Decode packet from bytes
-  factory Packet.decode(Uint8List bytes, {bool hasCrc = false}) {
+  factory Packet.decode(Uint8List bytes) {
     if (bytes.isEmpty) {
       throw DecodingException('Packet.decode: empty input');
     }
 
-    // Verify CRC if present
-    if (hasCrc) {
-      if (bytes.length < 2) {
-        throw DecodingException('Packet.decode: too short for CRC');
+    // Detect mode from first byte
+    final mode = HeaderFactory.detectMode(bytes[0]);
+
+    // Verify and strip integrity trailer
+    if (mode == PacketMode.compact) {
+      if (bytes.length < kCompactHeaderSize + kCrcSize) {
+        throw DecodingException('Packet.decode: too short for Compact+CRC');
       }
-      final actualCrc = bytes[bytes.length - 1];
-      final expectedCrc = Crc8.compute(bytes.sublist(0, bytes.length - 1));
-      if (actualCrc != expectedCrc) {
-        throw CrcMismatchException(expected: expectedCrc, actual: actualCrc);
+      final actual = bytes[bytes.length - 1];
+      final expected = Crc8.compute(bytes.sublist(0, bytes.length - 1));
+      if (actual != expected) {
+        throw CrcMismatchException(expected: expected, actual: actual);
       }
-      // Remove CRC byte for decoding
       bytes = bytes.sublist(0, bytes.length - 1);
+    } else {
+      if (bytes.length < kStandardHeaderSize + 4) {
+        throw DecodingException('Packet.decode: too short for Standard+CRC32');
+      }
+      final actual = Bitwise.read32BE(bytes, bytes.length - 4);
+      final expected = Crc32.compute(bytes.sublist(0, bytes.length - 4));
+      if (actual != expected) {
+        throw CrcMismatchException(expected: expected, actual: actual);
+      }
+      bytes = bytes.sublist(0, bytes.length - 4);
     }
 
     // Decode header
-    final mode = HeaderFactory.detectMode(bytes[0]);
     final headerSize = HeaderFactory.getHeaderSize(bytes[0]);
 
     if (bytes.length < headerSize) {
@@ -156,23 +150,23 @@ class Packet {
       );
     }
 
-    Object header;
-    if (mode == PacketMode.compact) {
-      header = CompactHeader.decode(bytes);
-    } else {
-      header = StandardHeader.decode(bytes);
-    }
+    final PacketHeader header =
+        mode == PacketMode.compact ? CompactHeader.decode(bytes) : StandardHeader.decode(bytes);
 
     // Get message type
-    final messageType = mode == PacketMode.compact
-        ? (header as CompactHeader).type
-        : (header as StandardHeader).type;
+    final messageType = header.type;
 
     // Extract payload bytes
     final payloadBytes = bytes.sublist(headerSize);
 
-    // Decode payload based on type
-    final payload = _decodePayload(messageType, payloadBytes, mode);
+    // Decode payload based on type.
+    //
+    // Fragment packets carry partial data: do NOT attempt to parse as a typed
+    // payload. We still want CRC fail-fast at Packet.decode level, so we return
+    // RawPayload here and let the fragmentation layer handle reassembly.
+    final payload = header.flags.isFragment
+        ? RawPayload(type: messageType, bytes: payloadBytes)
+        : _decodePayload(messageType, payloadBytes, mode);
 
     return Packet(header: header, payload: payload);
   }
@@ -199,6 +193,9 @@ class Packet {
       case MessageType.sosAck:
       case MessageType.dataAck:
         return AckPayload.decode(bytes, compact: mode == PacketMode.compact);
+
+      case MessageType.nack:
+        return NackPayload.decode(bytes);
 
       default:
         // Return text payload as fallback for unknown types
@@ -241,7 +238,7 @@ class Packet {
     final header = CompactHeader(
       type: MessageType.sosBeacon,
       flags: PacketFlags(mesh: true, urgent: true),
-      messageId: messageId ?? DateTime.now().millisecondsSinceEpoch & 0xFFFF,
+      messageId: messageId ?? MessageIdGenerator.generate(),
     );
 
     return Packet(header: header, payload: payload);
@@ -267,15 +264,14 @@ class Packet {
       final header = CompactHeader(
         type: MessageType.location,
         flags: PacketFlags(mesh: true),
-        messageId: messageId ?? DateTime.now().millisecondsSinceEpoch & 0xFFFF,
+        messageId: messageId ?? MessageIdGenerator.generate(),
       );
       return Packet(header: header, payload: payload);
     } else {
       final header = StandardHeader(
         type: MessageType.location,
         flags: PacketFlags(mesh: true),
-        messageId:
-            messageId ?? DateTime.now().millisecondsSinceEpoch & 0xFFFFFFFF,
+        messageId: messageId ?? MessageIdGenerator.generate32(),
         payloadLength: payload.sizeInBytes,
       );
       return Packet(header: header, payload: payload);
@@ -299,8 +295,7 @@ class Packet {
     final header = StandardHeader(
       type: MessageType.textShort,
       flags: PacketFlags(mesh: true, ackRequired: ackRequired),
-      messageId:
-          messageId ?? DateTime.now().millisecondsSinceEpoch & 0xFFFFFFFF,
+      messageId: messageId ?? MessageIdGenerator.generate32(),
       payloadLength: payload.sizeInBytes,
     );
 
@@ -324,15 +319,14 @@ class Packet {
       final header = CompactHeader(
         type: MessageType.sosAck,
         flags: PacketFlags(),
-        messageId: messageId ?? DateTime.now().millisecondsSinceEpoch & 0xFFFF,
+        messageId: messageId ?? MessageIdGenerator.generate(),
       );
       return Packet(header: header, payload: payload);
     } else {
       final header = StandardHeader(
         type: MessageType.dataAck,
         flags: PacketFlags(),
-        messageId:
-            messageId ?? DateTime.now().millisecondsSinceEpoch & 0xFFFFFFFF,
+        messageId: messageId ?? MessageIdGenerator.generate32(),
         payloadLength: payload.sizeInBytes,
       );
       return Packet(header: header, payload: payload);

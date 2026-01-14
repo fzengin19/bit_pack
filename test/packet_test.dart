@@ -30,20 +30,19 @@ void main() {
           longitude: 28.9784,
         );
 
-        // 4 (header) + 15 (payload) = 19 bytes
-        expect(packet.sizeInBytes, equals(19));
+        // 4 (header) + 15 (payload) + 1 (CRC-8) = 20 bytes
+        expect(packet.sizeInBytes, equals(20));
         expect(packet.fitsCompact, isTrue);
       });
 
-      test('SOS packet with CRC fits in 20 bytes', () {
+      test('SOS packet encodes to 20 bytes (CRC-8 is mandatory)', () {
         final packet = Packet.sos(
           sosType: SosType.needRescue,
           latitude: 41.0082,
           longitude: 28.9784,
         );
 
-        final encoded = packet.encode(includeCrc: true);
-        // 4 (header) + 15 (payload) + 1 (CRC) = 20 bytes
+        final encoded = packet.encode();
         expect(encoded.length, equals(20));
       });
     });
@@ -58,8 +57,8 @@ void main() {
 
         expect(packet.mode, equals(PacketMode.compact));
         expect(packet.type, equals(MessageType.location));
-        // 4 (header) + 8 (payload) = 12 bytes
-        expect(packet.sizeInBytes, equals(12));
+        // 4 (header) + 8 (payload) + 1 (CRC-8) = 13 bytes
+        expect(packet.sizeInBytes, equals(13));
       });
 
       test('creates extended location packet', () {
@@ -72,8 +71,8 @@ void main() {
         );
 
         expect(packet.mode, equals(PacketMode.standard));
-        // 11 (header) + 12 (payload) = 23 bytes
-        expect(packet.sizeInBytes, equals(23));
+        // 11 (header) + 12 (payload) + 4 (CRC-32) = 27 bytes
+        expect(packet.sizeInBytes, equals(27));
       });
     });
 
@@ -96,8 +95,8 @@ void main() {
 
         expect(packet.mode, equals(PacketMode.compact));
         expect(packet.type, equals(MessageType.sosAck));
-        // 4 (header) + 3 (payload) = 7 bytes
-        expect(packet.sizeInBytes, equals(7));
+        // 4 (header) + 3 (payload) + 1 (CRC-8) = 8 bytes
+        expect(packet.sizeInBytes, equals(8));
       });
     });
 
@@ -110,18 +109,7 @@ void main() {
         );
 
         final encoded = packet.encode();
-        expect(encoded.length, equals(19)); // 4 + 15
-      });
-
-      test('encodes with CRC', () {
-        final packet = Packet.sos(
-          sosType: SosType.needRescue,
-          latitude: 41.0082,
-          longitude: 28.9784,
-        );
-
-        final encoded = packet.encode(includeCrc: true);
-        expect(encoded.length, equals(20)); // 4 + 15 + 1
+        expect(encoded.length, equals(20)); // 4 + 15 + 1 (CRC-8)
       });
     });
 
@@ -142,19 +130,6 @@ void main() {
         expect(decoded.payload, isA<SosPayload>());
       });
 
-      test('decodes SOS packet with CRC', () {
-        final original = Packet.sos(
-          sosType: SosType.needRescue,
-          latitude: 41.0082,
-          longitude: 28.9784,
-        );
-
-        final encoded = original.encode(includeCrc: true);
-        final decoded = Packet.decode(encoded, hasCrc: true);
-
-        expect(decoded.type, equals(MessageType.sosBeacon));
-      });
-
       test('throws on CRC mismatch', () {
         final packet = Packet.sos(
           sosType: SosType.needRescue,
@@ -162,12 +137,12 @@ void main() {
           longitude: 28.9784,
         );
 
-        final encoded = packet.encode(includeCrc: true);
-        // Corrupt the CRC
+        final encoded = packet.encode();
+        // Corrupt the CRC-8
         encoded[encoded.length - 1] ^= 0xFF;
 
         expect(
-          () => Packet.decode(encoded, hasCrc: true),
+          () => Packet.decode(encoded),
           throwsA(isA<Exception>()),
         );
       });
@@ -198,22 +173,6 @@ void main() {
         expect(sosPayload.sosType, equals(SosType.trapped));
         expect(sosPayload.latitude, closeTo(41.0082, 0.0000001));
         expect(sosPayload.longitude, closeTo(28.9784, 0.0000001));
-      });
-
-      test('SOS packet roundtrip with CRC', () {
-        final original = Packet.sos(
-          sosType: SosType.needRescue,
-          latitude: 41.0082,
-          longitude: 28.9784,
-        );
-
-        final encoded = original.encode(includeCrc: true);
-        final decoded = Packet.decode(encoded, hasCrc: true);
-
-        expect(
-          (decoded.payload as SosPayload).sosType,
-          equals(SosType.needRescue),
-        );
       });
     });
   });

@@ -4,9 +4,10 @@
 
 library;
 
+import '../core/types.dart';
+import '../protocol/header/compact_header.dart';
 import '../protocol/header/standard_header.dart';
 import '../protocol/packet.dart';
-import 'message_cache.dart';
 
 // ============================================================================
 // RELAY POLICY
@@ -44,47 +45,21 @@ class RelayPolicy {
   /// Check if packet should be relayed
   ///
   /// [packet] The packet to check
-  /// [cache] Message cache for duplicate detection
-  /// [targetPeerId] Optional specific peer to relay to
-  bool shouldRelay(
-    Packet packet,
-    MessageCache cache, {
-    String? targetPeerId,
-  }) {
+  bool shouldRelay(Packet packet) {
     final header = packet.header;
 
-    // Only Standard Mode supports mesh relay
-    if (header is! StandardHeader) {
-      return false;
-    }
-
     // 1. MESH flag must be set
-    if (!header.flags.mesh) {
-      return false;
-    }
+    if (!header.flags.mesh) return false;
 
     // 2. TTL must be > 0
-    if (header.hopTtl <= 0) {
-      return false;
-    }
+    if (header.ttl <= 0) return false;
 
-    // 3. Message must not be expired
-    if (header.ageMinutes >= maxAgeMinutes) {
-      return false;
-    }
-
-    // 4. Must not be already seen (unless relaying to new peer)
-    final messageId = header.messageId;
-    if (targetPeerId != null) {
-      // Check if already relayed to this specific peer
-      if (cache.wasRelayedTo(messageId, targetPeerId)) {
-        return false;
-      }
+    // 3. Must not be expired (age-based applies to Standard)
+    if (header is StandardHeader) {
+      if (header.currentAgeMinutes >= maxAgeMinutes) return false;
+      if (header.isExpired) return false;
     } else {
-      // General check - have we processed this message?
-      if (cache.hasSeen(messageId)) {
-        return false;
-      }
+      if (header.isExpired) return false;
     }
 
     return true;
@@ -96,29 +71,26 @@ class RelayPolicy {
   /// - Updates age (if significantly delayed)
   ///
   /// Returns a new packet ready for relay.
-  Packet prepareForRelay(Packet packet, {int additionalAgeMinutes = 0}) {
+  Packet prepareForRelay(Packet packet) {
     final header = packet.header;
 
-    if (header is! StandardHeader) {
-      throw UnsupportedError('Only StandardHeader supports relay');
+    if (header is CompactHeader) {
+      final newHeader = header.decrementTtl();
+      return Packet(
+        header: newHeader,
+        payload: packet.payload,
+      );
     }
 
-    // Create new header with decremented TTL
-    final newHeader = StandardHeader(
-      type: header.type,
-      flags: header.flags,
-      hopTtl: header.hopTtl - 1,
-      messageId: header.messageId,
-      securityMode: header.securityMode,
-      payloadLength: header.payloadLength,
-      ageMinutes: header.ageMinutes + additionalAgeMinutes,
-    );
+    if (header is StandardHeader) {
+      final newHeader = header.prepareForRelay();
+      return Packet(
+        header: newHeader,
+        payload: packet.payload,
+      );
+    }
 
-    // Create new packet with updated header
-    return Packet(
-      header: newHeader,
-      payload: packet.payload,
-    );
+    throw UnsupportedError('Unsupported header type: ${header.runtimeType}');
   }
 
   /// Calculate priority for relay ordering
@@ -130,8 +102,6 @@ class RelayPolicy {
   /// - SOS message type: +200
   int calculatePriority(Packet packet) {
     final header = packet.header;
-    if (header is! StandardHeader) return 0;
-
     int priority = 0;
 
     // Urgent messages get high priority
@@ -140,11 +110,11 @@ class RelayPolicy {
     }
 
     // Lower TTL = higher priority (about to expire)
-    priority += (15 - header.hopTtl) * 10;
+    final ttlForPriority = header.ttl.clamp(0, 15);
+    priority += (15 - ttlForPriority) * 10;
 
     // SOS messages get highest priority
-    if (header.type.index <= 3) {
-      // SOS types are 0-3
+    if (header.type == MessageType.sosBeacon) {
       priority += 200;
     }
 

@@ -24,8 +24,8 @@
 ///   phoneNumber: '+905331234567',
 /// );
 ///
-/// final encoded = packet.encode(includeCrc: true);
-/// print('Packet: ${encoded.length} bytes'); // 20 bytes
+/// final encoded = packet.encode();
+/// print('Packet: ${encoded.length} bytes'); // 20 bytes (Compact CRC-8 dahil)
 /// ```
 
 library bit_pack;
@@ -38,6 +38,7 @@ export 'src/core/exceptions.dart';
 // Encoding
 export 'src/encoding/bitwise.dart';
 export 'src/encoding/crc8.dart';
+export 'src/encoding/crc32.dart';
 export 'src/encoding/varint.dart';
 export 'src/encoding/bcd.dart';
 export 'src/encoding/gps.dart';
@@ -46,10 +47,12 @@ export 'src/encoding/international_bcd.dart';
 // Protocol - Headers
 export 'src/protocol/header/compact_header.dart';
 export 'src/protocol/header/standard_header.dart';
+export 'src/protocol/header/packet_header.dart';
 export 'src/protocol/header/header_factory.dart';
 
 // Protocol - Payloads
 export 'src/protocol/payload/payload.dart';
+export 'src/protocol/payload/raw_payload.dart';
 export 'src/protocol/payload/sos_payload.dart';
 export 'src/protocol/payload/location_payload.dart';
 export 'src/protocol/payload/text_payload.dart';
@@ -68,6 +71,7 @@ export 'src/crypto/challenge.dart';
 // Fragmentation
 export 'src/fragmentation/fragment_header.dart';
 export 'src/fragmentation/fragmenter.dart';
+export 'src/fragmentation/packet_reassembler.dart';
 export 'src/fragmentation/reassembler.dart';
 export 'src/fragmentation/selective_repeat.dart';
 

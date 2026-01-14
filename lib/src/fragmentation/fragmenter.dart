@@ -16,6 +16,7 @@ import '../core/constants.dart';
 import '../core/exceptions.dart';
 import '../core/types.dart';
 import '../encoding/bitwise.dart';
+import '../encoding/crc32.dart';
 import '../protocol/header/standard_header.dart';
 import 'fragment_header.dart';
 
@@ -155,26 +156,12 @@ class Fragmenter {
     required MessageType messageType,
     int ttl = 10,
   }) {
-    // Calculate available payload per fragment
-    // Standard header (11) + Fragment header (3) = 14 bytes overhead
-    const headerOverhead = StandardHeader.sizeInBytes + FragmentHeader.sizeInBytes;
-    final payloadPerFragment = mtu - headerOverhead;
+    // NOTE: Standard mode has mandatory CRC-32 trailer (4 bytes).
+    const int crc32Size = 4;
 
-    if (payloadPerFragment <= 0) {
-      throw FragmentationException(
-        'MTU too small for headers: need > $headerOverhead bytes, got $mtu',
-      );
-    }
-
-    final totalFragments = (payload.length / payloadPerFragment).ceil();
-    if (totalFragments > FragmentHeader.maxTotalFragments) {
-      throw FragmentationException(
-        'Payload too large: needs $totalFragments fragments',
-      );
-    }
-
-    // If no fragmentation needed, return single packet without fragment header
-    if (totalFragments <= 1) {
+    // Fast path: if it fits in a single Standard packet (no fragment header).
+    final maxPayloadSingle = mtu - StandardHeader.headerSizeInBytes - crc32Size;
+    if (payload.length <= maxPayloadSingle) {
       final header = StandardHeader(
         type: messageType,
         flags: PacketFlags(),
@@ -185,10 +172,38 @@ class Fragmenter {
         ageMinutes: 0,
       );
 
-      final packet = Uint8List(StandardHeader.sizeInBytes + payload.length);
-      packet.setRange(0, StandardHeader.sizeInBytes, header.encode());
-      packet.setRange(StandardHeader.sizeInBytes, packet.length, payload);
+      final size = StandardHeader.headerSizeInBytes + payload.length + crc32Size;
+      final packet = Uint8List(size);
+      packet.setRange(0, StandardHeader.headerSizeInBytes, header.encode());
+      packet.setRange(
+        StandardHeader.headerSizeInBytes,
+        StandardHeader.headerSizeInBytes + payload.length,
+        payload,
+      );
+
+      final crcValue = Crc32.compute(packet.sublist(0, size - crc32Size));
+      Bitwise.write32BE(packet, size - crc32Size, crcValue);
       return [packet];
+    }
+
+    // Fragmented case:
+    // Standard header (11) + Fragment header (3) + CRC-32 (4) = 18 bytes overhead
+    const headerOverhead = StandardHeader.headerSizeInBytes +
+        FragmentHeader.sizeInBytes +
+        crc32Size;
+    final payloadPerFragment = mtu - headerOverhead;
+
+    if (payloadPerFragment <= 0) {
+      throw FragmentationException(
+        'MTU too small for headers+CRC: need > $headerOverhead bytes, got $mtu',
+      );
+    }
+
+    final totalFragments = (payload.length / payloadPerFragment).ceil();
+    if (totalFragments > FragmentHeader.maxTotalFragments) {
+      throw FragmentationException(
+        'Payload too large: needs $totalFragments fragments',
+      );
     }
 
     final fragments = <Uint8List>[];
@@ -212,7 +227,8 @@ class Fragmenter {
         hopTtl: ttl,
         messageId: messageId,
         securityMode: SecurityMode.none,
-        payloadLength: chunk.length,
+        // Payload includes FragmentHeader + chunk
+        payloadLength: FragmentHeader.sizeInBytes + chunk.length,
         ageMinutes: 0,
       );
 
@@ -223,19 +239,30 @@ class Fragmenter {
       );
 
       // Build complete fragment packet
-      final fragmentSize = StandardHeader.sizeInBytes + 
-          FragmentHeader.sizeInBytes + chunk.length;
+      final fragmentSize = StandardHeader.headerSizeInBytes +
+          FragmentHeader.sizeInBytes +
+          chunk.length +
+          crc32Size;
       final fragment = Uint8List(fragmentSize);
 
       int offset = 0;
-      fragment.setRange(offset, offset + StandardHeader.sizeInBytes, header.encode());
-      offset += StandardHeader.sizeInBytes;
+      fragment.setRange(
+        offset,
+        offset + StandardHeader.headerSizeInBytes,
+        header.encode(),
+      );
+      offset += StandardHeader.headerSizeInBytes;
 
 
       fragment.setRange(offset, offset + FragmentHeader.sizeInBytes, fragHeader.encode());
       offset += FragmentHeader.sizeInBytes;
 
-      fragment.setRange(offset, fragment.length, chunk);
+      fragment.setRange(offset, offset + chunk.length, chunk);
+
+      // CRC-32 trailer over header+payload (FragmentHeader+chunk)
+      final crcValue =
+          Crc32.compute(fragment.sublist(0, fragment.length - crc32Size));
+      Bitwise.write32BE(fragment, fragment.length - crc32Size, crcValue);
 
       fragments.add(fragment);
     }

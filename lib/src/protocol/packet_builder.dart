@@ -9,6 +9,7 @@ import '../core/types.dart';
 import '../encoding/bitwise.dart';
 import '../mesh/message_id_generator.dart';
 import 'header/compact_header.dart';
+import 'header/packet_header.dart';
 import 'header/standard_header.dart';
 import 'packet.dart';
 import 'payload/payload.dart';
@@ -194,12 +195,22 @@ class PacketBuilder {
   PacketMode _determineMode() {
     if (_mode != null) return _mode!;
 
+    final messageType = _type ?? _payload?.type;
+
     // Force standard if:
-    // - Encrypted
+    // - Standard-only message type
+    // - Encrypted / SecurityMode enabled
+    // - Fragmentation flags
     // - Payload too large for compact
     // - TTL > 15
     // - Age tracking needed
-    if (_encrypted || _ageMinutes > 0 || _ttl > 15) {
+    if ((messageType?.requiresStandardMode ?? false) ||
+        _securityMode != SecurityMode.none ||
+        _encrypted ||
+        _fragment ||
+        _moreFragments ||
+        _ageMinutes > 0 ||
+        _ttl > 15) {
       return PacketMode.standard;
     }
 
@@ -226,7 +237,7 @@ class PacketBuilder {
     final mode = _determineMode();
     final flags = _buildFlags();
 
-    Object header;
+    PacketHeader header;
     if (mode == PacketMode.compact) {
       header = CompactHeader(
         type: messageType,

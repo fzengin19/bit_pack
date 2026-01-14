@@ -12,34 +12,8 @@ import '../../core/exceptions.dart';
 import '../../core/types.dart';
 import '../../encoding/bitwise.dart';
 import 'compact_header.dart';
+import 'packet_header.dart';
 import 'standard_header.dart';
-
-/// Abstract base for all packet headers
-abstract class PacketHeader {
-  /// Get packet mode (compact or standard)
-  PacketMode get mode;
-
-  /// Get message type
-  MessageType get type;
-
-  /// Get packet flags
-  PacketFlags get flags;
-
-  /// Get hop TTL
-  int get ttl;
-
-  /// Get message ID
-  int get messageId;
-
-  /// Get header size in bytes
-  int get sizeInBytes;
-
-  /// Check if message has expired
-  bool get isExpired;
-
-  /// Encode header to bytes
-  Uint8List encode();
-}
 
 /// Factory for creating and parsing packet headers
 class HeaderFactory {
@@ -103,8 +77,8 @@ class HeaderFactory {
     final header = decode(bytes);
 
     final headerSize = header is CompactHeader
-        ? CompactHeader.sizeInBytes
-        : StandardHeader.sizeInBytes;
+        ? CompactHeader.headerSizeInBytes
+        : StandardHeader.headerSizeInBytes;
 
     if (bytes.length <= headerSize) {
       // No payload
@@ -121,8 +95,8 @@ class HeaderFactory {
   /// Returns 4 for compact, 10 for standard
   static int getHeaderSize(int firstByte) {
     return detectMode(firstByte) == PacketMode.compact
-        ? CompactHeader.sizeInBytes
-        : StandardHeader.sizeInBytes;
+        ? CompactHeader.headerSizeInBytes
+        : StandardHeader.headerSizeInBytes;
   }
 
   /// Check if there's enough data for a complete header
@@ -194,7 +168,7 @@ class HeaderFactory {
         securityMode != SecurityMode.none ||
         flags.isFragment ||
         flags.moreFragments ||
-        payloadLength > kBle42MaxPayload - kCompactHeaderSize ||
+        payloadLength > kCompactMaxPayload ||
         ageMinutes > 0 ||
         messageId > kMaxMessageId16 ||
         ttl > kCompactMaxHops;

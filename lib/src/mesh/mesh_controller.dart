@@ -8,7 +8,6 @@ library;
 import 'dart:async';
 
 import '../protocol/packet.dart';
-import '../protocol/header/standard_header.dart';
 import 'message_cache.dart';
 import 'relay_backoff.dart';
 import 'relay_policy.dart';
@@ -128,7 +127,7 @@ class MeshController {
     _receivedCount++;
 
     final header = packet.header;
-    final messageId = header is StandardHeader ? header.messageId : 0;
+    final messageId = header.messageId;
 
     // Notify backoff system (may cancel pending relay)
     backoff.onPacketReceived(messageId);
@@ -147,7 +146,7 @@ class MeshController {
     _eventController.add(PacketReceivedEvent(packet, isNew: true));
 
     // Check if should relay
-    if (header is StandardHeader && policy.shouldRelay(packet, cache)) {
+    if (policy.shouldRelay(packet)) {
       await _scheduleRelay(packet, fromPeerId);
     }
   }
@@ -157,7 +156,7 @@ class MeshController {
   /// Call this for originating new messages.
   Future<void> broadcast(Packet packet) async {
     final header = packet.header;
-    final messageId = header is StandardHeader ? header.messageId : 0;
+    final messageId = header.messageId;
 
     // Mark as seen (prevent echo)
     cache.markSeen(messageId);
@@ -170,7 +169,7 @@ class MeshController {
 
   /// Schedule relay with backoff
   Future<void> _scheduleRelay(Packet packet, String? fromPeerId) async {
-    final header = packet.header as StandardHeader;
+    final header = packet.header;
     final messageId = header.messageId;
 
     // Mark relay source
@@ -184,7 +183,7 @@ class MeshController {
     // Schedule with backoff
     final relayed = await backoff.scheduleRelay(
       messageId: messageId,
-      currentTtl: header.hopTtl,
+      currentTtl: header.ttl,
       originalTtl: defaultTtl,
       relayAction: () async {
         if (onBroadcast != null) {

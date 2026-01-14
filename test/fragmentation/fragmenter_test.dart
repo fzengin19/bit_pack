@@ -144,6 +144,98 @@ void main() {
         expect(fragmenter.maxPayloadPerFragment, equals(241)); // 244 - 3
       });
     });
+
+    group('fragmentWithHeaders (Standard packets)', () {
+      test('single packet includes CRC-32 and decodes', () {
+        final fragmenter = Fragmenter(mtu: 64);
+        final payload = TextPayload(text: 'Hello', senderId: 's', recipientId: null);
+        final payloadBytes = payload.encode();
+
+        final packets = fragmenter.fragmentWithHeaders(
+          payload: payloadBytes,
+          messageId: 0x12345678,
+          messageType: payload.type,
+          ttl: 10,
+        );
+
+        expect(packets.length, equals(1));
+        expect(packets[0].length, lessThanOrEqualTo(64));
+
+        final decoded = Packet.decode(packets[0]);
+        expect(decoded.header, isA<StandardHeader>());
+        expect(decoded.header.flags.isFragment, isFalse);
+        expect(decoded.payload, equals(payload));
+      });
+
+      test('fragment packets include CRC-32 and decode to RawPayload', () {
+        final fragmenter = Fragmenter(mtu: 32); // force many fragments
+        final payload = Uint8List.fromList(List.generate(200, (i) => i & 0xFF));
+
+        final packets = fragmenter.fragmentWithHeaders(
+          payload: payload,
+          messageId: 0xCAFEBABE,
+          messageType: MessageType.textShort,
+          ttl: 20,
+        );
+
+        expect(packets.length, greaterThan(1));
+        for (final p in packets) {
+          expect(p.length, lessThanOrEqualTo(32));
+          final decoded = Packet.decode(p);
+          expect(decoded.header, isA<StandardHeader>());
+          expect(decoded.header.flags.isFragment, isTrue);
+          expect(decoded.payload, isA<RawPayload>());
+        }
+      });
+
+      test('corrupted fragment fails fast at Packet.decode (CRC mismatch)', () {
+        final fragmenter = Fragmenter(mtu: 32);
+        final payload = Uint8List.fromList(List.generate(200, (i) => i & 0xFF));
+
+        final packets = fragmenter.fragmentWithHeaders(
+          payload: payload,
+          messageId: 0xDEADBEEF,
+          messageType: MessageType.textShort,
+          ttl: 20,
+        );
+        expect(packets.length, greaterThan(1));
+
+        final corrupted = Uint8List.fromList(packets[0]);
+        // Flip a byte near the end to likely hit CRC trailer.
+        corrupted[corrupted.length - 1] ^= 0xFF;
+
+        expect(
+          () => Packet.decode(corrupted),
+          throwsA(isA<CrcMismatchException>()),
+        );
+      });
+
+      test('reassembles to full Packet (typed) from fragment packets', () {
+        final fragmenter = Fragmenter(mtu: 48);
+        final payload = TextPayload(text: 'X' * 1000, senderId: 's', recipientId: null);
+        final payloadBytes = payload.encode();
+
+        final packets = fragmenter.fragmentWithHeaders(
+          payload: payloadBytes,
+          messageId: 0xA1B2C3D4,
+          messageType: payload.type,
+          ttl: 20,
+        );
+        expect(packets.length, greaterThan(1));
+
+        final reassembler = PacketFragmentReassembler();
+        Packet? full;
+        for (final bytes in packets) {
+          final frag = Packet.decode(bytes);
+          full = reassembler.addFragmentPacket(frag) ?? full;
+        }
+
+        expect(full, isNotNull);
+        expect(full!.header, isA<StandardHeader>());
+        expect(full!.header.flags.isFragment, isFalse);
+        expect(full!.payload, equals(payload));
+      });
+    });
   });
 
   group('Reassembler', () {
