@@ -58,6 +58,8 @@ export 'src/protocol/payload/location_payload.dart';
 export 'src/protocol/payload/text_payload.dart';
 export 'src/protocol/payload/ack_payload.dart';
 export 'src/protocol/payload/nack_payload.dart';
+export 'src/protocol/payload/text_location_payload.dart';
+export 'src/protocol/payload/challenge_payload.dart';
 
 // Protocol - Packet
 export 'src/protocol/packet.dart';

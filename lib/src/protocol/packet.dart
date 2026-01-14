@@ -24,6 +24,8 @@ import 'payload/text_payload.dart';
 import 'payload/ack_payload.dart';
 import 'payload/nack_payload.dart';
 import 'payload/raw_payload.dart';
+import 'payload/text_location_payload.dart';
+import 'payload/challenge_payload.dart';
 import '../mesh/message_id_generator.dart';
 
 /// Complete packet (header + payload)
@@ -150,8 +152,9 @@ class Packet {
       );
     }
 
-    final PacketHeader header =
-        mode == PacketMode.compact ? CompactHeader.decode(bytes) : StandardHeader.decode(bytes);
+    final PacketHeader header = mode == PacketMode.compact
+        ? CompactHeader.decode(bytes)
+        : StandardHeader.decode(bytes);
 
     // Get message type
     final messageType = header.type;
@@ -196,6 +199,12 @@ class Packet {
 
       case MessageType.nack:
         return NackPayload.decode(bytes);
+
+      case MessageType.textLocation:
+        return TextLocationPayload.decode(bytes);
+
+      case MessageType.challenge:
+        return ChallengePayload.decode(bytes);
 
       default:
         // Return text payload as fallback for unknown types

@@ -102,7 +102,13 @@ enum MessageType {
   groupBroadcast(0x1A),
 
   /// Peer discovery beacon
-  peerDiscovery(0x1B);
+  peerDiscovery(0x1B),
+
+  /// Hybrid Text+Location (0x1C) - Protocol v1.1
+  textLocation(0x1C),
+
+  /// Security Challenge (0x1D) - Protocol v1.1
+  challenge(0x1D);
 
   final int code;
   const MessageType(this.code);

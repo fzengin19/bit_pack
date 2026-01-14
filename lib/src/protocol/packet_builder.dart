@@ -4,6 +4,8 @@
 
 library;
 
+import 'dart:typed_data';
+
 import '../core/constants.dart';
 import '../core/types.dart';
 import '../encoding/bitwise.dart';
@@ -15,6 +17,8 @@ import 'packet.dart';
 import 'payload/payload.dart';
 import 'payload/text_payload.dart';
 import 'payload/location_payload.dart';
+import 'payload/text_location_payload.dart';
+import 'payload/challenge_payload.dart';
 
 // ============================================================================
 // PACKET BUILDER
@@ -175,6 +179,28 @@ class PacketBuilder {
       altitude: altitude,
     );
     _type ??= MessageType.location;
+    return this;
+  }
+
+  /// Set text+location payload (Protocol v1.1)
+  PacketBuilder textLocation(double lat, double lon, String text) {
+    _payload = TextLocationPayload(latitude: lat, longitude: lon, text: text);
+    _type ??= MessageType.textLocation;
+    return this;
+  }
+
+  /// Set challenge payload (Protocol v1.1)
+  PacketBuilder challenge(
+    Uint8List salt,
+    String question,
+    Uint8List ciphertext,
+  ) {
+    _payload = ChallengePayload(
+      salt: salt,
+      question: question,
+      ciphertext: ciphertext,
+    );
+    _type ??= MessageType.challenge;
     return this;
   }
 
