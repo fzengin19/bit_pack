@@ -77,14 +77,15 @@ const int kMaxMessageId32 = 0xFFFFFFFF;
 // PAYLOAD LIMITS
 // ============================================================================
 
+/// CRC-8 size in bytes (mandatory for Compact Mode)
+const int kCrcSize = 1;
+
 /// Maximum payload length (13 bits in Standard header)
 const int kMaxPayloadLength = 8191;
 
-/// Compact SOS payload size (excluding header)
-const int kCompactSosPayloadSize = 15;
-
-/// Compact SOS with CRC total size
-const int kCompactSosTotalSize = 20; // 4 header + 15 payload + 1 CRC
+/// Maximum payload for Compact Mode (BLE 4.2)
+/// Formula: MTU (20) - Header (4) - CRC (1) = 15 bytes
+const int kCompactMaxPayload = kBle42MaxPayload - kCompactHeaderSize - kCrcSize;
 
 // ============================================================================
 // FRAGMENTATION

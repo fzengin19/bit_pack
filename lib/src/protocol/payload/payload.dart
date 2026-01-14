@@ -7,6 +7,7 @@ library;
 
 import 'dart:typed_data';
 
+import '../../core/constants.dart';
 import '../../core/types.dart';
 
 /// Abstract base class for all payload types
@@ -26,8 +27,8 @@ abstract class Payload {
 
 /// Mixin for payloads that support compact mode (BLE 4.2)
 mixin CompactPayload on Payload {
-  /// Maximum size for compact mode (16 bytes = 20 MTU - 4 header)
-  static const int maxCompactSize = 16;
+  /// Maximum size for compact mode (15 bytes = 20 MTU - 4 header - 1 CRC)
+  static const int maxCompactSize = kCompactMaxPayload;
 
   /// Check if this payload fits in compact mode
   bool get fitsCompactMode => sizeInBytes <= maxCompactSize;

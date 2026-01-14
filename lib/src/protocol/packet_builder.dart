@@ -4,6 +4,7 @@
 
 library;
 
+import '../core/constants.dart';
 import '../core/types.dart';
 import '../encoding/bitwise.dart';
 import '../mesh/message_id_generator.dart';
@@ -205,7 +206,7 @@ class PacketBuilder {
     if (_payload != null) {
       // Compact max payload: 20 (MTU) - 4 (header) - 1 (CRC) = 15 bytes
       // CRC is mandatory for data integrity in mesh/emergency scenarios
-      if (_payload!.sizeInBytes > 15) {
+      if (_payload!.sizeInBytes > kCompactMaxPayload) {
         return PacketMode.standard;
       }
     }

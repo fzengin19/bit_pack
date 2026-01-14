@@ -12,6 +12,7 @@ library;
 
 import 'dart:typed_data';
 
+import '../core/constants.dart';
 import '../core/exceptions.dart';
 import '../core/types.dart';
 import '../encoding/bitwise.dart';
@@ -40,13 +41,13 @@ class Fragmenter {
   final int mtu;
 
   /// Minimum MTU (header + fragment header + at least 1 byte payload)
-  static const int minMtu = 20;
+  static const int minMtu = kBle42MaxPayload;
 
   /// Default MTU for BLE 5.0+
   static const int defaultMtu = 244;
 
   /// BLE 4.2 MTU
-  static const int ble42Mtu = 20;
+  static const int ble42Mtu = kBle42MaxPayload;
 
   /// Create a fragmenter with specified MTU
   ///

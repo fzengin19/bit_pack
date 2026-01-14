@@ -1,7 +1,7 @@
 /// Compact Header Implementation (4 bytes)
 ///
 /// BLE 4.2 compatible header for emergency/low-overhead packets.
-/// Total size: 4 bytes (fits within 20-byte MTU with 16-byte payload)
+/// Total size: 4 bytes (fits within 20-byte MTU with 15-byte payload + 1 CRC)
 ///
 /// Layout:
 /// ```

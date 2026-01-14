@@ -61,12 +61,13 @@ class Packet {
     return (header as StandardHeader).messageId;
   }
 
-  /// Check if packet fits in BLE 4.2 MTU (20 bytes)
+  /// Check if packet fits in BLE 4.2 MTU (20 bytes) with mandatory CRC
+  ///
+  /// For safety-critical Compact Mode: Header (4) + Payload + CRC (1) <= 20
   bool get fitsCompact {
-    final headerSize = header is CompactHeader
-        ? kCompactHeaderSize
-        : kStandardHeaderSize;
-    return headerSize + payload.sizeInBytes <= kBle42MaxPayload;
+    if (header is! CompactHeader) return false;
+    // Compact Mode: 4 header + payload + 1 CRC <= 20 MTU
+    return kCompactHeaderSize + payload.sizeInBytes + kCrcSize <= kBle42MaxPayload;
   }
 
   /// Total packet size in bytes
@@ -80,6 +81,8 @@ class Packet {
   }
 
   /// Encode packet to bytes
+  ///
+  /// For Compact Mode, [includeCrc] should be true for safe transmission.
   Uint8List encode({bool includeCrc = false}) {
     if (_encoded != null && !includeCrc) return _encoded!;
 
@@ -90,6 +93,16 @@ class Packet {
 
     // Encode payload
     final payloadBytes = payload.encode();
+
+    // Safety assertion for Compact Mode
+    // BLE 4.2 MTU = 20 bytes: Header (4) + Payload + CRC (1)
+    if (header is CompactHeader && includeCrc) {
+      final totalSize = headerBytes.length + payloadBytes.length + kCrcSize;
+      assert(
+        totalSize <= kBle42MaxPayload,
+        'Compact packet with CRC exceeds 20-byte MTU: $totalSize bytes',
+      );
+    }
 
     // Combine
     int size = headerBytes.length + payloadBytes.length;
