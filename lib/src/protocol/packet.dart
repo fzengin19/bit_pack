@@ -207,15 +207,8 @@ class Packet {
         return ChallengePayload.decode(bytes);
 
       default:
-        // Return text payload as fallback for unknown types
-        if (bytes.isNotEmpty) {
-          try {
-            return TextPayload.decode(bytes);
-          } catch (_) {
-            // Fall through
-          }
-        }
-        throw DecodingException('Unknown message type: ${type.name}');
+        // Return RawPayload for unknown types (forward compatibility)
+        return RawPayload(type: type, bytes: bytes);
     }
   }
 

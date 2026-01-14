@@ -22,6 +22,7 @@
 
 library;
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../core/exceptions.dart';
@@ -150,7 +151,7 @@ class AckPayload extends Payload {
   int get sizeInBytes {
     int size = isCompact ? compactSize : standardSize;
     if (reason != null) {
-      size += 1 + reason!.length; // Length byte + UTF-8
+      size += 1 + utf8.encode(reason!).length; // Length byte + UTF-8
     }
     return size;
   }
@@ -175,7 +176,7 @@ class AckPayload extends Payload {
 
     // REASON (optional)
     if (reason != null) {
-      final reasonBytes = reason!.codeUnits;
+      final reasonBytes = utf8.encode(reason!);
       buffer[offset++] = reasonBytes.length.clamp(0, 255);
       buffer.setRange(
         offset,
@@ -219,9 +220,7 @@ class AckPayload extends Payload {
     if (offset < bytes.length) {
       final reasonLen = bytes[offset++];
       if (offset + reasonLen <= bytes.length) {
-        reason = String.fromCharCodes(
-          bytes.sublist(offset, offset + reasonLen),
-        );
+        reason = utf8.decode(bytes.sublist(offset, offset + reasonLen));
       }
     }
 

@@ -182,23 +182,39 @@ class PacketBuilder {
     return this;
   }
 
-  /// Set text+location payload (Protocol v1.1)
-  PacketBuilder textLocation(double lat, double lon, String text) {
-    _payload = TextLocationPayload(latitude: lat, longitude: lon, text: text);
+  /// Set text+location payload (Protocol v1.1.1)
+  PacketBuilder textLocation(
+    double lat,
+    double lon,
+    String text, {
+    String? senderId,
+    String? recipientId,
+  }) {
+    _payload = TextLocationPayload(
+      latitude: lat,
+      longitude: lon,
+      text: text,
+      senderId: senderId,
+      recipientId: recipientId,
+    );
     _type ??= MessageType.textLocation;
     return this;
   }
 
-  /// Set challenge payload (Protocol v1.1)
+  /// Set challenge payload (Protocol v1.1.1)
   PacketBuilder challenge(
     Uint8List salt,
     String question,
-    Uint8List ciphertext,
-  ) {
+    Uint8List ciphertext, {
+    String? senderId,
+    String? recipientId,
+  }) {
     _payload = ChallengePayload(
       salt: salt,
       question: question,
       ciphertext: ciphertext,
+      senderId: senderId,
+      recipientId: recipientId,
     );
     _type ??= MessageType.challenge;
     return this;

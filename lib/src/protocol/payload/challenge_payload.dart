@@ -1,9 +1,20 @@
-/// Challenge Payload (0x1D)
+/// Challenge Payload (0x1D) - Protocol v1.1.1
 ///
-/// Secure challenge payload for zero-knowledge verification.
+/// Secure challenge payload for zero-knowledge verification with optional identity.
 ///
-/// Layout:
-/// [SALT: 16 bytes][Q_LEN: 1 byte][QUESTION: N bytes][CIPHERTEXT: Remaining]
+/// Layout (v1.1.1):
+/// ```
+/// BYTE 0:     FLAGS
+///             Bit 7: Has sender ID
+///             Bit 6: Has recipient ID
+///             Bits 5-0: Reserved
+/// [BYTES 1-N]: SENDER_ID length (1 byte) + SENDER_ID (UTF-8)
+/// [BYTES N-M]: RECIPIENT_ID length (1 byte) + RECIPIENT_ID (UTF-8)
+/// NEXT 16 BYTES: SALT
+/// NEXT 1 BYTE:  Q_LEN (question length)
+/// NEXT Q_LEN:   QUESTION (UTF-8)
+/// REMAINING:    CIPHERTEXT
+/// ```
 
 library;
 
@@ -14,8 +25,14 @@ import '../../core/types.dart';
 import '../../core/exceptions.dart';
 import 'payload.dart';
 
-/// Secure challenge payload
+/// Secure challenge payload with optional identity
 class ChallengePayload extends Payload {
+  /// Flag: has sender ID
+  static const int _flagHasSender = 0x80;
+
+  /// Flag: has recipient ID
+  static const int _flagHasRecipient = 0x40;
+
   /// Random salt (16 bytes)
   final Uint8List salt;
 
@@ -25,11 +42,19 @@ class ChallengePayload extends Payload {
   /// Encrypted answer/nonce (ciphertext)
   final Uint8List ciphertext;
 
+  /// Sender identifier (optional)
+  final String? senderId;
+
+  /// Recipient identifier (optional)
+  final String? recipientId;
+
   /// Create a challenge payload
   ChallengePayload({
     required this.salt,
     required this.question,
     required this.ciphertext,
+    this.senderId,
+    this.recipientId,
   }) {
     // Validate salt length
     if (salt.length != 16) {
@@ -45,69 +70,191 @@ class ChallengePayload extends Payload {
     }
   }
 
+  /// Create a broadcast challenge
+  factory ChallengePayload.broadcast({
+    required Uint8List salt,
+    required String question,
+    required Uint8List ciphertext,
+    String? senderId,
+  }) {
+    return ChallengePayload(
+      salt: salt,
+      question: question,
+      ciphertext: ciphertext,
+      senderId: senderId,
+    );
+  }
+
+  /// Create a direct challenge to a specific recipient
+  factory ChallengePayload.direct({
+    required Uint8List salt,
+    required String question,
+    required Uint8List ciphertext,
+    required String recipientId,
+    String? senderId,
+  }) {
+    return ChallengePayload(
+      salt: salt,
+      question: question,
+      ciphertext: ciphertext,
+      senderId: senderId,
+      recipientId: recipientId,
+    );
+  }
+
   @override
   MessageType get type => MessageType.challenge;
 
+  /// Check if this is a broadcast challenge
+  bool get isBroadcast => recipientId == null;
+
   @override
   int get sizeInBytes {
+    int size = 1; // FLAGS byte
+
+    if (senderId != null) {
+      size += 1 + utf8.encode(senderId!).length;
+    }
+
+    if (recipientId != null) {
+      size += 1 + utf8.encode(recipientId!).length;
+    }
+
     final qLen = utf8.encode(question).length;
-    return 16 + 1 + qLen + ciphertext.length;
+    size +=
+        16 +
+        1 +
+        qLen +
+        ciphertext.length; // Salt + QLen + Question + Ciphertext
+
+    return size;
   }
 
   @override
   Uint8List encode() {
     final qBytes = utf8.encode(question);
-    final size = 16 + 1 + qBytes.length + ciphertext.length;
-    final buffer = Uint8List(size);
+    final senderBytes = senderId != null ? utf8.encode(senderId!) : null;
+    final recipientBytes = recipientId != null
+        ? utf8.encode(recipientId!)
+        : null;
 
-    // 1. Write Salt (16 bytes)
-    buffer.setRange(0, 16, salt);
+    final buffer = Uint8List(sizeInBytes);
+    int offset = 0;
 
-    // 2. Write Question Length (1 byte)
-    buffer[16] = qBytes.length;
+    // BYTE 0: FLAGS
+    int flags = 0;
+    if (senderId != null) flags |= _flagHasSender;
+    if (recipientId != null) flags |= _flagHasRecipient;
+    buffer[offset++] = flags;
 
-    // 3. Write Question Bytes
-    buffer.setRange(17, 17 + qBytes.length, qBytes);
+    // SENDER_ID (if present)
+    if (senderBytes != null) {
+      buffer[offset++] = senderBytes.length;
+      buffer.setRange(offset, offset + senderBytes.length, senderBytes);
+      offset += senderBytes.length;
+    }
 
-    // 4. Write Ciphertext (Remaining)
-    buffer.setRange(17 + qBytes.length, size, ciphertext);
+    // RECIPIENT_ID (if present)
+    if (recipientBytes != null) {
+      buffer[offset++] = recipientBytes.length;
+      buffer.setRange(offset, offset + recipientBytes.length, recipientBytes);
+      offset += recipientBytes.length;
+    }
+
+    // SALT (16 bytes)
+    buffer.setRange(offset, offset + 16, salt);
+    offset += 16;
+
+    // Q_LEN (1 byte)
+    buffer[offset++] = qBytes.length;
+
+    // QUESTION
+    buffer.setRange(offset, offset + qBytes.length, qBytes);
+    offset += qBytes.length;
+
+    // CIPHERTEXT (remaining)
+    buffer.setRange(offset, offset + ciphertext.length, ciphertext);
 
     return buffer;
   }
 
   /// Decode from bytes
   factory ChallengePayload.decode(Uint8List bytes) {
-    if (bytes.length < 17) {
-      throw DecodingException(
-        'ChallengePayload too short: ${bytes.length} bytes (min 17)',
-      );
+    if (bytes.isEmpty) {
+      throw DecodingException('ChallengePayload: empty input');
     }
 
-    // 1. Read Salt
-    final salt = bytes.sublist(0, 16);
+    int offset = 0;
 
-    // 2. Read Question Length
-    final qLen = bytes[16];
+    // BYTE 0: FLAGS
+    final flags = bytes[offset++];
+    final hasSender = (flags & _flagHasSender) != 0;
+    final hasRecipient = (flags & _flagHasRecipient) != 0;
 
-    // Check bounds
-    if (bytes.length < 17 + qLen) {
-      throw DecodingException(
-        'ChallengePayload truncated question: expected $qLen bytes, '
-        'available ${bytes.length - 17}',
-      );
+    String? senderId;
+    String? recipientId;
+
+    // SENDER_ID
+    if (hasSender) {
+      if (offset >= bytes.length) {
+        throw DecodingException('ChallengePayload: missing sender length');
+      }
+      final senderLen = bytes[offset++];
+      if (offset + senderLen > bytes.length) {
+        throw DecodingException('ChallengePayload: truncated sender');
+      }
+      senderId = utf8.decode(bytes.sublist(offset, offset + senderLen));
+      offset += senderLen;
     }
 
-    // 3. Read Question
-    final qBytes = bytes.sublist(17, 17 + qLen);
+    // RECIPIENT_ID
+    if (hasRecipient) {
+      if (offset >= bytes.length) {
+        throw DecodingException('ChallengePayload: missing recipient length');
+      }
+      final recipientLen = bytes[offset++];
+      if (offset + recipientLen > bytes.length) {
+        throw DecodingException('ChallengePayload: truncated recipient');
+      }
+      recipientId = utf8.decode(bytes.sublist(offset, offset + recipientLen));
+      offset += recipientLen;
+    }
+
+    // SALT (16 bytes)
+    if (offset + 16 > bytes.length) {
+      throw DecodingException(
+        'ChallengePayload: insufficient salt data at offset $offset',
+      );
+    }
+    final salt = bytes.sublist(offset, offset + 16);
+    offset += 16;
+
+    // Q_LEN
+    if (offset >= bytes.length) {
+      throw DecodingException('ChallengePayload: missing question length');
+    }
+    final qLen = bytes[offset++];
+
+    // QUESTION
+    if (offset + qLen > bytes.length) {
+      throw DecodingException(
+        'ChallengePayload: truncated question, expected $qLen bytes, '
+        'available ${bytes.length - offset}',
+      );
+    }
+    final qBytes = bytes.sublist(offset, offset + qLen);
     final question = utf8.decode(qBytes);
+    offset += qLen;
 
-    // 4. Read Ciphertext
-    final ciphertext = bytes.sublist(17 + qLen);
+    // CIPHERTEXT (remaining)
+    final ciphertext = bytes.sublist(offset);
 
     return ChallengePayload(
-      salt: salt,
+      salt: Uint8List.fromList(salt),
       question: question,
-      ciphertext: ciphertext,
+      ciphertext: Uint8List.fromList(ciphertext),
+      senderId: senderId,
+      recipientId: recipientId,
     );
   }
 
@@ -117,14 +264,50 @@ class ChallengePayload extends Payload {
       salt: Uint8List.fromList(salt),
       question: question,
       ciphertext: Uint8List.fromList(ciphertext),
+      senderId: senderId,
+      recipientId: recipientId,
     );
   }
 
   @override
   String toString() {
-    return 'ChallengePayload('
-        'salt: ${salt.length}B, '
-        'q: "$question", '
-        'cipher: ${ciphertext.length}B)';
+    final parts = <String>[];
+    if (senderId != null) parts.add('from: $senderId');
+    if (recipientId != null) {
+      parts.add('to: $recipientId');
+    } else {
+      parts.add('broadcast');
+    }
+    parts.add('salt: ${salt.length}B');
+    parts.add('q: "$question"');
+    parts.add('cipher: ${ciphertext.length}B');
+    return 'ChallengePayload(${parts.join(', ')})';
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! ChallengePayload) return false;
+    if (other.question != question) return false;
+    if (other.senderId != senderId) return false;
+    if (other.recipientId != recipientId) return false;
+    if (other.salt.length != salt.length) return false;
+    for (int i = 0; i < salt.length; i++) {
+      if (other.salt[i] != salt[i]) return false;
+    }
+    if (other.ciphertext.length != ciphertext.length) return false;
+    for (int i = 0; i < ciphertext.length; i++) {
+      if (other.ciphertext[i] != ciphertext[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    question,
+    senderId,
+    recipientId,
+    Object.hashAll(salt),
+    Object.hashAll(ciphertext),
+  );
 }
