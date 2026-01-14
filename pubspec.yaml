@@ -1,7 +1,7 @@
 name: bit_pack
-description: "A new Flutter package project."
-version: 0.0.1
-homepage:
+description: "A bandwidth-efficient binary protocol for off-grid mesh networking over BLE 4.0+. Designed for emergency communication apps."
+version: 1.0.0
+repository: https://github.com/your-org/bit_pack
 
 environment:
   sdk: ^3.10.4
