@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-01-15
+
+### Added
+
+- **Identity Support**: `TextLocationPayload` and `ChallengePayload` now support `senderId` and `recipientId`.
+- **FLAGS Byte**: New payloads use FLAGS at Offset 0 (Bit 7 = Sender, Bit 6 = Recipient).
+- **Forward Compatibility**: Unknown `MessageType` returns `RawPayload` instead of throwing.
+
+### Fixed
+
+- **UTF-8 Support**: `AckPayload` now uses `utf8.encode/decode` for Turkish and emoji characters.
+
+### Breaking Changes
+
+- `TextLocationPayload` binary layout changed (GPS moved from Offset 0 to dynamic offset).
+- `ChallengePayload` binary layout changed (Salt moved from Offset 0 to dynamic offset).
+- v1.x clients cannot decode v2.0 payloads.
+
 ## [1.1.0] - 2026-01-15
 
 ### Added
