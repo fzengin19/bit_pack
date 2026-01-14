@@ -787,11 +787,12 @@ class RelayPolicy {
 - [x] `reassembler.dart` - Fragment assembly + buffer management
 - [x] Unit tests (56 tests)
 
-### Phase 6: Mesh Support (Week 3-4)
-- [ ] `message_cache.dart` - Duplicate detection
-- [ ] `relay_policy.dart` - Relay decisions
-- [ ] `peer_registry.dart` - Peer tracking
-- [ ] Integration tests
+### Phase 6: Mesh Support (Week 3-4) ✅ COMPLETED
+- [x] `message_cache.dart` - LRU cache + duplicate detection
+- [x] `relay_policy.dart` - Relay decisions + TTL/age handling
+- [x] `relay_backoff.dart` - Exponential backoff + jitter
+- [x] `mesh_controller.dart` - Integration controller
+- [x] Unit tests (37 tests)
 
 ### Phase 7: Polish & Publish (Week 4)
 - [ ] API documentation

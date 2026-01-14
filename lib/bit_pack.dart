@@ -69,3 +69,9 @@ export 'src/fragmentation/fragment_header.dart';
 export 'src/fragmentation/fragmenter.dart';
 export 'src/fragmentation/reassembler.dart';
 export 'src/fragmentation/selective_repeat.dart';
+
+// Mesh
+export 'src/mesh/message_cache.dart';
+export 'src/mesh/relay_backoff.dart';
+export 'src/mesh/relay_policy.dart';
+export 'src/mesh/mesh_controller.dart';
